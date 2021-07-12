@@ -200,12 +200,10 @@ class ImagesTest(TestCase):
         self.guest_client = Client()
 
     def test_image_shows_correctly_on_pages_with_paginator(self):
-        """Картинка отображается на страницах: -index,
-                                               -group,
+        """Картинка отображается на страницах: -group,
                                                -profile,
         """
         target_responses = {
-            'index': self.guest_client.get(reverse('posts:index')),
             'group': self.guest_client.get(
                 reverse('posts:group', kwargs={'slug': self.group.slug})
             ),
@@ -216,10 +214,16 @@ class ImagesTest(TestCase):
         }
         for response in target_responses.values():
             with self.subTest(response=response):
-                cache.clear()
                 self.assertEqual(
                     response.context['page'][0].image, self.post.image
                 )
+
+    def test_image_shows_correctly_on_indexpage(self):
+        cache.clear()
+        response = self.guest_client.get(reverse('posts:index'))
+        self.assertEqual(
+            response.context['page'][0].image, self.post.image
+        )
 
     def test_images_shows_correctly_on_single_post_page(self):
         """Картинка отображается на странице поста."""

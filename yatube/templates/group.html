@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %} Записи сообщества {{ group.title }}{% endblock %}
+
+{# Если я выношу хидэр из блок контента, то пайтест начинает ругаться на это:/ #}
+{% block content %}
+{% block header %}<h1>{{ group.title }}</h1>{% endblock %}
+    <p>
+    {{ group.description }}
+    </p>
+    {% for post in page %}
+    {% include "includes/post_item.html" with post=post %} 
+   
+    {% endfor %}   
+    {% include "includes/paginator.html" with items=page paginator=paginator%}
+
+{% endblock %}    

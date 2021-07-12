@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %} Профиль пользователя {{ user.username }} {% endblock %}
+{% block content %}
+
+<main role="main" class="container">
+  <div class="row">
+    {% include "includes/author.html" %}
+    <div class="col-md-9">
+        <!-- Начало блока с отдельным постом -->
+        {% include "includes/thumbnail.html" %}
+        {% for post in page %}   
+            {% include "includes/post_item.html" with post=post %}
+        {% endfor %}
+          
+       
+        {% include "includes/paginator.html" with items=page paginator=paginator%}
+        
+        <!-- Конец блока с отдельным постом -->
+        <!-- Остальные посты -->
+        <!-- Здесь постраничная навигация паджинатора -->
+        
+      </div>
+    </div>
+  </main> 
+{% endblock %} 

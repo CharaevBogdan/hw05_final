@@ -1,6 +1,11 @@
+import shutil
+import tempfile
+
 from django import forms
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
 from django.urls import reverse
 
@@ -17,12 +22,11 @@ class PostsViewsTest(TestCase):
         cls.group = Group.objects.create(title='test_title',
                                          slug='Test_slug',
                                          description='Test_desc',
-                                         id=1)
+                                         )
         cls.post = Post.objects.create(
             text='Test_text',
             author=cls.user,
             group=cls.group,
-            id=1
         )
 
     def setUp(self):
@@ -148,7 +152,19 @@ class PostsViewsTest(TestCase):
         self.assertTrue(
             self.user2.following.filter(user=self.user).exists()
         )
-        # перешел по кнопке отписаться
+
+    def test_authorized_client_can_unsubscribe(self):
+        """Авторизованный пользователь может отписываться"""
+        # создаем юзера2 и подписываем на него юзера 1
+        self.user2 = User.objects.create(username='tester')
+        self.authorized_client.get(
+            reverse('posts:profile_follow',
+                    kwargs={'username': self.user2.username})
+        )
+        self.assertTrue(
+            self.user2.following.filter(user=self.user).exists()
+        )
+        # все проверили подписка появилась, теперь отписываем
         self.authorized_client.get(
             reverse('posts:profile_unfollow',
                     kwargs={'username': self.user2.username})
@@ -193,18 +209,6 @@ class PostsViewsTest(TestCase):
         self.form_data = {
             'text': 'sample_text'
         }
-        self.guest_client.post(
-            reverse('posts:add_comment',
-                    kwargs={'username': self.user.username,
-                            'post_id': self.post.id}),
-            data=self.form_data,
-            follow=True
-        )
-        self.assertFalse(
-            Comment.objects.filter(author=self.user,
-                                   post=self.post,
-                                   text=self.form_data['text']).exists()
-        )
         self.authorized_client.post(
             reverse('posts:add_comment',
                     kwargs={'username': self.user.username,
@@ -213,6 +217,23 @@ class PostsViewsTest(TestCase):
             follow=True
         )
         self.assertTrue(
+            Comment.objects.filter(author=self.user,
+                                   post=self.post,
+                                   text=self.form_data['text']).exists()
+        )
+
+    def test_guest_client_cant_comment(self):
+        self.form_data = {
+            'text': 'sample_text'
+        }
+        self.guest_client.post(
+            reverse('posts:add_comment',
+                    kwargs={'username': self.user.username,
+                            'post_id': self.post.id}),
+            data=self.form_data,
+            follow=True
+        )
+        self.assertFalse(
             Comment.objects.filter(author=self.user,
                                    post=self.post,
                                    text=self.form_data['text']).exists()
@@ -327,4 +348,77 @@ class CacheTestView(TestCase):
         content_after_cache_clear = response.content
         self.assertNotEqual(
             content_before_new, content_after_cache_clear
+        )
+
+
+class ImagesTest(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        settings.MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
+        cls.user = User.objects.create_user(username='TestBro')
+        cls.group = Group.objects.create(title='test_title',
+                                         slug='test_slug',
+                                         description='test_desc')
+        small_gif = (b'\x47\x49\x46\x38\x39\x61\x02\x00'
+                     b'\x01\x00\x80\x00\x00\x00\x00\x00'
+                     b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
+                     b'\x00\x00\x00\x2C\x00\x00\x00\x00'
+                     b'\x02\x00\x01\x00\x00\x02\x02\x0C'
+                     b'\x0A\x00\x3B'
+                     )
+        uploaded = SimpleUploadedFile(name='small.gif',
+                                      content=small_gif,
+                                      content_type='image/gif'
+                                      )
+        cls.post = Post.objects.create(text='Sample_text',
+                                       author=cls.user,
+                                       group=cls.group,
+                                       image=uploaded,
+                                       )
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(settings.MEDIA_ROOT, ignore_errors=True)
+        super().tearDownClass()
+
+    def setUp(self):
+        self.guest_client = Client()
+
+    def test_image_shows_correctly_on_pages_with_paginator(self):
+        """Картинка отображается на страницах: -group,
+                                               -profile,
+        """
+        target_responses = {
+            'group': self.guest_client.get(
+                reverse('posts:group', kwargs={'slug': self.group.slug})
+            ),
+            'profile': self.guest_client.get(
+                reverse('posts:profile',
+                        kwargs={'username': self.user.username})
+            ),
+        }
+        for response in target_responses.values():
+            with self.subTest(response=response):
+                self.assertEqual(
+                    response.context['page'][0].image, self.post.image
+                )
+
+    def test_image_shows_correctly_on_indexpage(self):
+        cache.clear()
+        response = self.guest_client.get(reverse('posts:index'))
+        self.assertEqual(
+            response.context['page'][0].image, self.post.image
+        )
+
+    def test_images_shows_correctly_on_single_post_page(self):
+        """Картинка отображается на странице поста."""
+        cache.clear()
+        response = self.guest_client.get(
+            reverse('posts:post',
+                    kwargs={'username': self.user.username,
+                            'post_id': self.post.id})
+        )
+        self.assertEqual(
+            response.context['post'].image, self.post.image
         )

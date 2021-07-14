@@ -321,8 +321,7 @@ class CacheTestView(TestCase):
         super().setUpClass()
         cls.user = User.objects.create(username='User')
         cls.post = Post.objects.create(text='Text',
-                                       author=cls.user,
-                                       id=1)
+                                       author=cls.user)
 
     def setUp(self):
         self.authorized_client = Client()

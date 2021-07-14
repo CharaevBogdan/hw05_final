@@ -52,7 +52,6 @@ class PostCreateFormTests(TestCase):
 
     def test_create_post(self):
         posts_count = Post.objects.count()
-        cache.clear()
         target_redirect = reverse('posts:index')
         small_gif = (
             b'\x47\x49\x46\x38\x39\x61\x02\x00'
@@ -73,6 +72,7 @@ class PostCreateFormTests(TestCase):
             'text': 'Тестовый текст',
             'image': uploaded,
         }
+        cache.clear()
         response = self.authorized_client.post(
             reverse('posts:new_post'),
             data=form_data,
@@ -143,7 +143,7 @@ class PostCreateFormTests(TestCase):
         self.authorized_client.get(
             reverse('posts:group', kwargs={'slug': self.group.id}))
 
-        post_1 = Post.objects.get(id=1)
+        post_1 = Post.objects.get(author=self.user, id=self.post.id)
 
         self.assertRedirects(response, reverse('posts:post',
                              kwargs={'username': self.user.username,
